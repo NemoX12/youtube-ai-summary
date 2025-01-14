@@ -1,6 +1,6 @@
 {
   "name": "YouTube AI Summary",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Summarize the video using AI",
   "permissions": ["tabs"],
   "host_permissions": ["https://*.youtube.com/*"],
