@@ -1,0 +1,32 @@
+{
+  "name": "YouTube AI Summary",
+  "version": "0.0.1",
+  "description": "Summarize the video using AI",
+  "permissions": ["tabs"],
+  "host_permissions": ["https://*.youtube.com/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*.youtube.com/*"],
+      "js": ["contentScript.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/aiicon.svg"],
+      "matches": ["https://*.youtube.com/*"]
+    }
+  ],
+  "action": {
+    "default_icon": {
+      "24": "assets/logo.png",
+      "16": "assets/logo.png",
+      "32": "assets/logo.png"
+    },
+    "default_title": "AI Video Summary",
+    "default_popup": "popup.html"
+  },
+  "manifest_version": 3
+}
