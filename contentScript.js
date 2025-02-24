@@ -153,19 +153,27 @@
 
               displayLoader();
 
-              chrome.runtime.sendMessage(
-                { type: "SUMMARIZE", value: parsedTranscript },
-                (response) => {
-                  if (chrome.runtime.lastError) {
-                    console.error("Error sending message:", chrome.runtime.lastError);
-                  } else if (response && response.summary) {
-                    summary = response.summary;
-                    displaySummary(summary);
-                  } else {
-                    console.error("No summary received");
-                  }
+              chrome.storage.local.get([videoId], (result) => {
+                if (result[videoId]) {
+                  return;
+                } else {
+                  chrome.runtime.sendMessage(
+                    { type: "SUMMARIZE", value: parsedTranscript },
+                    (response) => {
+                      if (chrome.runtime.lastError) {
+                        console.error("Error sending message:", chrome.runtime.lastError);
+                      } else if (response && response.summary) {
+                        summary = response.summary;
+                        chrome.storage.local.set({ [videoId]: summary });
+                        displaySummary(summary);
+                        disableAiButton();
+                      } else {
+                        console.error("No summary received");
+                      }
+                    }
+                  );
                 }
-              );
+              });
             });
         });
     }
@@ -190,13 +198,11 @@
 
   const displayLoader = () => {
     const middleRow = document.getElementById("middle-row");
-    let summaryDiv = document.getElementById("summary-div");
-
     if (!middleRow) {
-      console.error("Element with ID 'middle-row' not found");
       return;
     }
 
+    let summaryDiv = document.getElementById("summary-div");
     if (!summaryDiv) {
       summaryDiv = document.createElement("div");
       summaryDiv.id = "summary-div";
@@ -224,9 +230,7 @@
 
   const displaySummary = (summary) => {
     const summaryDiv = document.getElementById("summary-div");
-
     if (!summaryDiv) {
-      console.error("Element with ID 'summary-div' not found");
       return;
     }
 
@@ -249,6 +253,15 @@
     }
   };
 
+  const disableAiButton = () => {
+    const aiButton = document.getElementById("ai-button");
+    if (aiButton) {
+      aiButton.style.pointerEvents = "none";
+      aiButton.style.opacity = "0.5";
+      aiButton.title = "Summary already generated";
+    }
+  };
+
   const newVideoLoaded = () => {
     const aiButtonExists = document.getElementById("ai-button");
 
@@ -264,7 +277,22 @@
       youtubeLeftControls = document.getElementsByClassName("ytp-left-controls")[0];
 
       youtubeLeftControls.appendChild(aiButton);
+    } else {
+      const aiButton = document.getElementById("ai-button");
+      aiButton.style.pointerEvents = "auto";
+      aiButton.style.opacity = "1";
+      aiButton.title = "Click to summarize this video";
     }
+
+    const videoId = new URLSearchParams(window.location.search).get("v");
+
+    chrome.storage.local.get([videoId], (result) => {
+      if (result[videoId]) {
+        displayLoader();
+        displaySummary(result[videoId]);
+        disableAiButton();
+      }
+    });
   };
 
   chrome.runtime.onMessage.addListener((obj, sender, response) => {
