@@ -6,19 +6,14 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     tab.url &&
     tab.url.includes("youtube.com/watch")
   ) {
-    fetch(chrome.runtime.getURL("key.json"))
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error("Something went wrong reading key.json: " + res.status);
-        }
-        return res.json();
-      })
-      .then((data) => {
-        key = data.AI_API_KEY;
-      })
-      .catch((error) => {
-        console.error("Something went wrong:", error);
-      });
+    chrome.storage.local.get("AI_API_KEY", (result) => {
+      if (result.AI_API_KEY) {
+        key = result.AI_API_KEY;
+      } else {
+        key = "";
+        console.error("API key not found in storage");
+      }
+    });
 
     const queryParameters = tab.url.split("?")[1];
     const urlParameters = new URLSearchParams(queryParameters);
@@ -34,6 +29,12 @@ chrome.runtime.onMessage.addListener((obj, sender, sendResponse) => {
   const { type } = obj;
 
   if (type === "SUMMARIZE") {
+    if (!key) {
+      console.error("API key is missing. Cannot generate summary.");
+      sendResponse({ summary: "API key is missing. Cannot generate summary." });
+      return false;
+    }
+
     summarizeText(obj.value)
       .then((summary) => {
         sendResponse({ summary });
