@@ -1,4 +1,5 @@
 let key = "";
+let lang = "us";
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (
@@ -6,12 +7,15 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     tab.url &&
     tab.url.includes("youtube.com/watch")
   ) {
-    chrome.storage.local.get("AI_API_KEY", (result) => {
+    chrome.storage.local.get(["AI_API_KEY", "LANG"], (result) => {
       if (result.AI_API_KEY) {
         key = result.AI_API_KEY;
       } else {
         key = "";
         console.error("API key not found in storage");
+      }
+      if (result.LANG) {
+        lang = result.LANG;
       }
     });
 
@@ -57,7 +61,9 @@ const summarizeText = async (text) => {
         parts: [
           {
             text:
-              `Summarize this text and return as plain on english and not much:\n` + text,
+              `Summarize this text and return as plain ${
+                lang === "ua" ? "Ukrainian" : "English"
+              } and not much:\n` + text,
           },
         ],
       },
