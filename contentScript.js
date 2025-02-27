@@ -104,6 +104,8 @@
   let summary = "";
 
   const handleClickAiButton = () => {
+    displayLoader(); // TODO: fix delay before requesting subtitiles
+
     const videoId = new URLSearchParams(window.location.search).get("v");
     const YT_INITIAL_PLAYER_RESPONSE_RE =
       /ytInitialPlayerResponse\s*=\s*({.+?})\s*;\s*(?:var\s+(?:meta|head)|<\/script|\n)/;
@@ -150,8 +152,6 @@
                 .join(" ")
                 .replace(/[\u200B-\u200D\uFEFF]/g, "")
                 .replace(/\s+/g, " ");
-
-              displayLoader();
 
               chrome.storage.local.get([videoId], (result) => {
                 if (result[videoId]) {
