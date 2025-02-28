@@ -161,14 +161,15 @@
                     { type: "SUMMARIZE", value: parsedTranscript },
                     (response) => {
                       if (chrome.runtime.lastError) {
-                        console.error("Error sending message:", chrome.runtime.lastError);
-                      } else if (response && response.summary) {
+                        console.error(chrome.runtime.lastError);
+                        displayError("Error sending message. Please try again.");
+                      } else if (response && response.summary && !response.error) {
                         summary = response.summary;
                         chrome.storage.local.set({ [videoId]: summary });
                         displaySummary(summary);
                         disableAiButton();
                       } else {
-                        console.error("No summary received");
+                        displayError("No summary received. Please try again.");
                       }
                     }
                   );
@@ -210,6 +211,7 @@
       summaryDiv.style.padding = "12px";
       summaryDiv.style.borderRadius = "14px";
       summaryDiv.style.backgroundColor = "rgba(39, 39, 39, 0.9)";
+      summaryDiv.style.textAlign = "center";
       summaryDiv.style.fontSize = "14px";
       summaryDiv.style.color = "#fff";
 
@@ -237,13 +239,45 @@
     summaryDiv.innerHTML = "";
 
     const summaryTitle = document.createElement("h3");
+    summaryTitle.style.textAlign = "left";
     summaryTitle.textContent = "AI Summary:";
 
     const summaryContent = document.createElement("div");
+    summaryContent.style.textAlign = "left";
     summaryContent.textContent = summary;
 
     summaryDiv.appendChild(summaryTitle);
     summaryDiv.appendChild(summaryContent);
+  };
+
+  const displayError = (message) => {
+    const summaryDiv = document.getElementById("summary-div");
+    if (!summaryDiv) {
+      return;
+    }
+
+    summaryDiv.innerHTML = "";
+
+    const errorMessage = document.createElement("div");
+    errorMessage.textContent = message;
+    errorMessage.style.color = "red";
+    errorMessage.style.fontSize = "16px";
+    errorMessage.style.fontWeight = 800;
+    errorMessage.style.margin = "10px 0 20px 0";
+
+    const regenerateButton = document.createElement("button");
+    regenerateButton.textContent = "Regenerate";
+    regenerateButton.style.padding = "10px";
+    regenerateButton.style.margin = "5px";
+    regenerateButton.style.border = "none";
+    regenerateButton.style.borderRadius = "5px";
+    regenerateButton.style.backgroundColor = "red";
+    regenerateButton.style.color = "#fff";
+    regenerateButton.style.cursor = "pointer";
+    regenerateButton.addEventListener("click", handleClickAiButton);
+
+    summaryDiv.appendChild(errorMessage);
+    summaryDiv.appendChild(regenerateButton);
   };
 
   const clearSummary = () => {

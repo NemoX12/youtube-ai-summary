@@ -34,18 +34,20 @@ chrome.runtime.onMessage.addListener((obj, sender, sendResponse) => {
 
   if (type === "SUMMARIZE") {
     if (!key) {
-      console.error("API key is missing. Cannot generate summary.");
-      sendResponse({ summary: "API key is missing. Cannot generate summary." });
+      sendResponse({
+        summary: "API key is missing. Cannot generate summary.",
+        error: true,
+      });
       return false;
     }
 
     summarizeText(obj.value)
       .then((summary) => {
-        sendResponse({ summary });
+        sendResponse({ summary, error: false });
       })
       .catch((error) => {
-        console.error("Error summarizing text:", error);
-        sendResponse({ summary: "Error summarizing text" });
+        console.error(error);
+        sendResponse({ summary: "Error summarizing text", error: true });
       });
     return true;
   }
@@ -89,7 +91,7 @@ const summarizeText = async (text) => {
     const data = await response.json();
     return data.candidates[0].content.parts[0].text;
   } catch (error) {
-    console.error("Error summarizing text:", error);
+    console.error(error);
     return "Something went wrong, please try later";
   }
 };
