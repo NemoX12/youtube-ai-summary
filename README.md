@@ -2,7 +2,7 @@
 
 YouTube AI Summary is a Chrome extension that provides AI-generated summaries for YouTube videos using the Gemini API.
 
-![demo](./assets/readme/demo.gif)
+![demo](./assets/readme/dema.gif)
 
 ## Features
 
