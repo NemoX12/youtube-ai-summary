@@ -119,6 +119,7 @@
           const playerResponse = body.match(YT_INITIAL_PLAYER_RESPONSE_RE);
           if (!playerResponse) {
             console.warn("Unable to parse playerResponse");
+            displayError("Unable to parse player response. Please try again.");
             return;
           }
           player = JSON.parse(playerResponse[1]);
@@ -128,6 +129,12 @@
             author: player.videoDetails.author,
             views: player.videoDetails.viewCount,
           };
+
+          if (!player.captions || !player.captions.playerCaptionsTracklistRenderer) {
+            displayError("No captions available for this video.");
+            return;
+          }
+
           const tracks = player.captions.playerCaptionsTracklistRenderer.captionTracks;
           tracks.sort(compareTracks);
 
