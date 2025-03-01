@@ -104,7 +104,7 @@
   let summary = "";
 
   const handleClickAiButton = () => {
-    displayLoader(); // TODO: fix delay before requesting subtitiles
+    displayLoader();
 
     const videoId = new URLSearchParams(window.location.search).get("v");
     const YT_INITIAL_PLAYER_RESPONSE_RE =
