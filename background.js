@@ -1,5 +1,5 @@
 let key = "";
-let lang = "us";
+let lang = ""
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (
@@ -30,18 +30,17 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 });
 
 chrome.runtime.onMessage.addListener((obj, sender, sendResponse) => {
-  const { type } = obj;
+  const { type, value, videoTitle } = obj;
 
   if (type === "SUMMARIZE") {
     if (!key) {
       sendResponse({
-        summary: "API key is missing. Cannot generate summary.",
         error: true,
       });
       return false;
     }
 
-    summarizeText(obj.value)
+    summarizeText(value, videoTitle)
       .then((summary) => {
         sendResponse({ summary, error: false });
       })
@@ -54,7 +53,7 @@ chrome.runtime.onMessage.addListener((obj, sender, sendResponse) => {
   return false;
 });
 
-const summarizeText = async (text) => {
+const summarizeText = async (text, videoTitle) => {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
 
   const requestBody = {
@@ -62,10 +61,9 @@ const summarizeText = async (text) => {
       {
         parts: [
           {
-            text:
-              `Summarize this text and return as plain ${
-                lang === "ua" ? "Ukrainian" : "English"
-              } and not much:\n` + text,
+            text: `
+              Summarize the following subtitles from the video titled "${videoTitle}". The summary should be not too long, concise, in ${lang} language and easy to read:\n\n${text}.
+            `,
           },
         ],
       },
@@ -89,9 +87,16 @@ const summarizeText = async (text) => {
     });
 
     const data = await response.json();
-    return data.candidates[0].content.parts[0].text;
+
+    if (
+      data.candidates &&
+      data.candidates[0].content.parts
+    ) {
+      return data.candidates[0].content.parts[0].text;
+    } else {
+      console.error("Unexpected API response structure:", data);
+    }
   } catch (error) {
-    console.error(error);
-    return "Something went wrong, please try later";
+    console.error("Error fetching summary:", error);
   }
 };

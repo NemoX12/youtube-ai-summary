@@ -1,7 +1,8 @@
 (() => {
   const style = document.createElement("style");
+
   style.textContent = `
-      .ai-button-style {
+      #ai-button {
         filter: invert(100%);
         width: 20px;
         height: 20px;
@@ -10,7 +11,7 @@
         cursor: pointer;
         transition: filter 0.3s;
       }
-      .ai-button-style:hover {
+      #ai-button:hover {
         filter: invert(80%);
       }
       .roller {
@@ -101,108 +102,113 @@
   document.head.append(style);
 
   let youtubeLeftControls;
+  let summaryVisible = true;
   let summary = "";
 
   const handleClickAiButton = () => {
     displayLoader();
 
     const videoId = new URLSearchParams(window.location.search).get("v");
-    const YT_INITIAL_PLAYER_RESPONSE_RE =
-      /ytInitialPlayerResponse\s*=\s*({.+?})\s*;\s*(?:var\s+(?:meta|head)|<\/script|\n)/;
-    let player = window.ytInitialPlayerResponse;
-    if (!player || videoId !== player.videoDetails.videoId) {
-      fetch("https://www.youtube.com/watch?v=" + videoId)
-        .then(function (response) {
-          return response.text();
-        })
-        .then(function (body) {
-          const playerResponse = body.match(YT_INITIAL_PLAYER_RESPONSE_RE);
-          if (!playerResponse) {
-            console.warn("Unable to parse playerResponse");
-            displayError("Unable to parse player response. Please try again.");
-            return;
-          }
-          player = JSON.parse(playerResponse[1]);
-          const metadata = {
-            title: player.videoDetails.title,
-            duration: player.videoDetails.lengthSeconds,
-            author: player.videoDetails.author,
-            views: player.videoDetails.viewCount,
-          };
 
-          if (!player.captions || !player.captions.playerCaptionsTracklistRenderer) {
-            displayError("No captions available for this video.");
-            return;
-          }
-
-          const tracks = player.captions.playerCaptionsTracklistRenderer.captionTracks;
-          tracks.sort(compareTracks);
-
-          fetch(tracks[0].baseUrl + "&fmt=json3")
+    chrome.storage.local.get([videoId], (result) => {
+      if (result[videoId]) {
+        displaySummary(result[videoId]);
+        disableAiButton();
+        return;
+      } else {
+        const YT_INITIAL_PLAYER_RESPONSE_RE =
+          /ytInitialPlayerResponse\s*=\s*({.+?})\s*;\s*(?:var\s+(?:meta|head)|<\/script|\n)/;
+        let player = window.ytInitialPlayerResponse;
+        if (!player || videoId !== player.videoDetails.videoId) {
+          fetch("https://www.youtube.com/watch?v=" + videoId)
             .then(function (response) {
-              return response.json();
+              return response.text();
             })
-            .then(function (transcript) {
-              const result = { transcript: transcript, metadata: metadata };
+            .then(function (body) {
+              const playerResponse = body.match(YT_INITIAL_PLAYER_RESPONSE_RE);
+              if (!playerResponse) {
+                console.warn("Unable to parse playerResponse");
+                displayError("Unable to parse player response. Please try again.");
+                return;
+              }
+              player = JSON.parse(playerResponse[1]);
 
-              const parsedTranscript = transcript.events
-                .filter(function (x) {
-                  return x.segs;
+              if (!player.captions || !player.captions.playerCaptionsTracklistRenderer) {
+                displayError("No captions available for this video.");
+                return;
+              }
+
+              const tracks =
+                player.captions.playerCaptionsTracklistRenderer.captionTracks;
+              tracks.sort(compareTracks);
+
+              fetch(tracks[0].baseUrl + "&fmt=json3")
+                .then(function (response) {
+                  return response.json();
                 })
-                .map(function (x) {
-                  return x.segs
-                    .map(function (y) {
-                      return y.utf8;
+                .then(function (transcript) {
+                  const parsedTranscript = transcript.events
+                    .filter(function (x) {
+                      return x.segs;
                     })
-                    .join(" ");
-                })
-                .join(" ")
-                .replace(/[\u200B-\u200D\uFEFF]/g, "")
-                .replace(/\s+/g, " ");
+                    .map(function (x) {
+                      return x.segs
+                        .map((y) => {
+                          return y.utf8;
+                        })
+                        .join(" ");
+                    })
+                    .join(" ")
+                    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+                    .replace(/\s+/g, " ");
 
-              chrome.storage.local.get([videoId], (result) => {
-                if (result[videoId]) {
-                  return;
-                } else {
                   chrome.runtime.sendMessage(
-                    { type: "SUMMARIZE", value: parsedTranscript },
+                    {
+                      type: "SUMMARIZE",
+                      value: parsedTranscript,
+                      videoTitle: player.videoDetails.title,
+                    },
                     (response) => {
                       if (chrome.runtime.lastError) {
                         console.error(chrome.runtime.lastError);
                         displayError("Error sending message. Please try again.");
-                      } else if (response && response.summary && !response.error) {
+                      } else if (response.error) {
+                        if (response.message === undefined) {
+                          displayError("Missing key or summary");
+                        } else {
+                          displayError(response.message);
+                        }
+                      } else {
                         summary = response.summary;
                         chrome.storage.local.set({ [videoId]: summary });
                         displaySummary(summary);
                         disableAiButton();
-                      } else {
-                        displayError("No summary received. Please try again.");
                       }
                     }
                   );
-                }
-              });
+                });
             });
-        });
-    }
-
-    function compareTracks(track1, track2) {
-      const langCode1 = track1.languageCode;
-      const langCode2 = track2.languageCode;
-
-      if (langCode1 === "en" && langCode2 !== "en") {
-        return -1;
-      } else if (langCode1 !== "en" && langCode2 === "en") {
-        return 1;
-      } else if (track1.kind !== "asr" && track2.kind === "asr") {
-        return -1;
-      } else if (track1.kind === "asr" && track2.kind !== "asr") {
-        return 1;
+        }
       }
-
-      return 0;
-    }
+    });
   };
+
+  function compareTracks(track1, track2) {
+    const langCode1 = track1.languageCode;
+    const langCode2 = track2.languageCode;
+
+    if (langCode1 === "en" && langCode2 !== "en") {
+      return -1;
+    } else if (langCode1 !== "en" && langCode2 === "en") {
+      return 1;
+    } else if (track1.kind !== "asr" && track2.kind === "asr") {
+      return -1;
+    } else if (track1.kind === "asr" && track2.kind !== "asr") {
+      return 1;
+    }
+
+    return 0;
+  }
 
   const displayLoader = () => {
     const middleRow = document.getElementById("middle-row");
@@ -245,16 +251,43 @@
 
     summaryDiv.innerHTML = "";
 
+    const toggleButton = document.createElement("button");
+    toggleButton.textContent = "Hide";
+    toggleButton.style.padding = "5px";
+    toggleButton.style.border = "none";
+    toggleButton.style.borderRadius = "5px";
+    toggleButton.style.backgroundColor = "#494949";
+    toggleButton.style.color = "#fff";
+    toggleButton.style.cursor = "pointer";
+
+    const summaryContainer = document.createElement("div");
+    summaryContainer.setAttribute("id", "summary-container");
+    summaryContainer.style.listStyle = "none";
+
+    toggleButton.addEventListener("click", () => {
+      if (summaryVisible) {
+        summaryContainer.style.display = "none";
+        toggleButton.textContent = "Show Summary";
+      } else {
+        summaryContainer.style.display = "block";
+        toggleButton.textContent = "Hide";
+      }
+      summaryVisible = !summaryVisible;
+    });
+
+    summaryDiv.appendChild(toggleButton);
+    summaryDiv.appendChild(summaryContainer);
+
     const summaryTitle = document.createElement("h3");
     summaryTitle.style.textAlign = "left";
-    summaryTitle.textContent = "AI Summary:";
+    summaryTitle.innerHTML = "AI Summary:";
 
     const summaryContent = document.createElement("div");
     summaryContent.style.textAlign = "left";
-    summaryContent.textContent = summary;
+    summaryContent.innerHTML = summary;
 
-    summaryDiv.appendChild(summaryTitle);
-    summaryDiv.appendChild(summaryContent);
+    summaryContainer.appendChild(summaryTitle);
+    summaryContainer.appendChild(summaryContent);
   };
 
   const displayError = (message) => {
@@ -306,34 +339,59 @@
   const newVideoLoaded = () => {
     const aiButtonExists = document.getElementById("ai-button");
 
-    if (!aiButtonExists) {
-      const aiButton = document.createElement("img");
-      aiButton.id = "ai-button";
-      aiButton.src = chrome.runtime.getURL("assets/aiicon.svg");
-      aiButton.classList.add("ai-button-style");
-      aiButton.title = "Click to summarize this video";
-
-      aiButton.addEventListener("click", handleClickAiButton);
-
-      youtubeLeftControls = document.getElementsByClassName("ytp-left-controls")[0];
-
-      youtubeLeftControls.appendChild(aiButton);
-    } else {
-      const aiButton = document.getElementById("ai-button");
-      aiButton.style.pointerEvents = "auto";
-      aiButton.style.opacity = "1";
-      aiButton.title = "Click to summarize this video";
+    if (aiButtonExists) {
+      aiButtonExists.remove();
     }
 
-    const videoId = new URLSearchParams(window.location.search).get("v");
+    const aiButton = document.createElement("img");
+    aiButton.id = "ai-button";
+    aiButton.src = chrome.runtime.getURL("assets/aiicon.svg");
+    aiButton.title = "Click to summarize this video";
 
-    chrome.storage.local.get([videoId], (result) => {
-      if (result[videoId]) {
-        displayLoader();
-        displaySummary(result[videoId]);
-        disableAiButton();
+    aiButton.addEventListener("click", handleClickAiButton);
+
+    const addButtonToControls = () => {
+      youtubeLeftControls = document.getElementsByClassName("ytp-left-controls")[0];
+      if (!youtubeLeftControls) {
+        console.warn("YouTube left controls not found");
+        return;
       }
-    });
+
+      if (!document.getElementById("ai-button")) {
+        youtubeLeftControls.appendChild(aiButton);
+      }
+
+      const videoId = new URLSearchParams(window.location.search).get("v");
+      if (!videoId) {
+        console.warn("Video ID not found");
+        return;
+      }
+
+      chrome.storage.local.get([videoId], (result) => {
+        if (result[videoId]) {
+          displayLoader();
+          displaySummary(result[videoId]);
+          disableAiButton();
+        }
+      });
+    };
+
+    if (!document.getElementsByClassName("ytp-left-controls")[0]) {
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.addedNodes.length) {
+            if (document.getElementsByClassName("ytp-left-controls")[0]) {
+              observer.disconnect();
+              addButtonToControls();
+            }
+          }
+        });
+      });
+
+      observer.observe(document.body, { childList: true, subtree: true });
+    } else {
+      addButtonToControls();
+    }
   };
 
   chrome.runtime.onMessage.addListener((obj, sender, response) => {

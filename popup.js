@@ -1,29 +1,22 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const langUa = document.getElementById("lang_ua");
-  const langUs = document.getElementById("lang_us");
+  const langBtn = document.querySelectorAll(".lang_btn");
   const apiKeyInput = document.getElementById("apiKey");
   const setKeyButton = document.getElementById("setKey");
-  const removeKeyButton = document.createElement("button");
-  removeKeyButton.id = "removeKey";
-  removeKeyButton.textContent = "Remove API Key";
-  removeKeyButton.style.display = "none";
-  document.querySelector(".form").appendChild(removeKeyButton);
+  const removeKeyButton = document.getElementById("removeKey");
 
   chrome.storage.local.get(["AI_API_KEY", "LANG"], (result) => {
     if (result.AI_API_KEY) {
-      apiKeyInput.value = result.AI_API_KEY;
+      apiKeyInput.value = "********"; 
       apiKeyInput.disabled = true;
       setKeyButton.disabled = true;
       removeKeyButton.style.display = "block";
     }
     if (result.LANG) {
-      if (result.LANG === "ua") {
-        langUa.classList.add("lang_active");
-        langUs.classList.remove("lang_active");
-      } else {
-        langUa.classList.remove("lang_active");
-        langUs.classList.add("lang_active");
-      }
+      langBtn.forEach((btn) => {
+        if (btn.id === result.LANG) {
+          btn.classList.add("lang_active");
+        }
+      });
     }
   });
 
@@ -31,6 +24,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const apiKey = apiKeyInput.value;
     if (apiKey) {
       chrome.storage.local.set({ AI_API_KEY: apiKey }, () => {
+        apiKeyInput.value = "********"; 
         apiKeyInput.disabled = true;
         setKeyButton.disabled = true;
         removeKeyButton.style.display = "block";
@@ -53,22 +47,16 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  langUa.addEventListener("click", () => {
-    chrome.storage.local.set({ LANG: "ua" }, () => {
-      langUa.classList.add("lang_active");
-      langUs.classList.remove("lang_active");
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        chrome.tabs.reload(tabs[0].id);
-      });
-    });
-  });
-
-  langUs.addEventListener("click", () => {
-    chrome.storage.local.set({ LANG: "us" }, () => {
-      langUa.classList.remove("lang_active");
-      langUs.classList.add("lang_active");
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        chrome.tabs.reload(tabs[0].id);
+  langBtn.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      chrome.storage.local.set({ LANG: btn.id }, () => {
+        langBtn.forEach((btn) => {
+          btn.classList.remove("lang_active");
+        });
+        btn.classList.add("lang_active");
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          chrome.tabs.reload(tabs[0].id);
+        });
       });
     });
   });
