@@ -20,7 +20,7 @@ YouTube AI Summary is a Chrome extension that provides AI-generated summaries fo
 
 2. Load the extension in Chrome:
 
-   1. Open Chrome and go to [chrome://extensions/](http://_vscodecontentref_/1).
+   1. Open Chrome and go to `chrome://extensions/`.
    2. Enable "Developer mode" by toggling the switch in the top right corner.
    3. Click on "Load unpacked" and select the project directory.
 

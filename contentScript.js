@@ -1,6 +1,9 @@
 (() => {
   const style = document.createElement("style");
 
+  const root = document.documentElement;
+  const theme = root.hasAttribute("dark") ? "dark" : "light";
+
   style.textContent = `
       #ai-button {
         filter: invert(100%);
@@ -31,7 +34,7 @@
         width: 7px;
         height: 7px;
         border-radius: 50%;
-        background: #fff;
+        background: #000;
         margin: -4px 0 0 -4px;
       }
       .roller div:nth-child(1) {
@@ -103,94 +106,82 @@
 
   let youtubeLeftControls;
   let summaryVisible = true;
-  let summary = "";
 
   const handleClickAiButton = () => {
     displayLoader();
-
     const videoId = new URLSearchParams(window.location.search).get("v");
-
+  
     chrome.storage.local.get([videoId], (result) => {
       if (result[videoId]) {
         displaySummary(result[videoId]);
         disableAiButton();
-        return;
       } else {
-        const YT_INITIAL_PLAYER_RESPONSE_RE =
-          /ytInitialPlayerResponse\s*=\s*({.+?})\s*;\s*(?:var\s+(?:meta|head)|<\/script|\n)/;
+        const YT_INITIAL_PLAYER_RESPONSE_RE = /ytInitialPlayerResponse\s*=\s*({.+?})\s*;\s*(?:var\s+(?:meta|head)|<\/script|\n)/;
+      
         let player = window.ytInitialPlayerResponse;
         if (!player || videoId !== player.videoDetails.videoId) {
-          fetch("https://www.youtube.com/watch?v=" + videoId)
-            .then(function (response) {
-              return response.text();
-            })
-            .then(function (body) {
+          fetch(`https://www.youtube.com/watch?v=${videoId}`)
+            .then((response) => response.text())
+            .then((body) => {
               const playerResponse = body.match(YT_INITIAL_PLAYER_RESPONSE_RE);
               if (!playerResponse) {
-                console.warn("Unable to parse playerResponse");
                 displayError("Unable to parse player response. Please try again.");
                 return;
               }
               player = JSON.parse(playerResponse[1]);
-
-              if (!player.captions || !player.captions.playerCaptionsTracklistRenderer) {
-                displayError("No captions available for this video.");
-                return;
-              }
-
-              const tracks =
-                player.captions.playerCaptionsTracklistRenderer.captionTracks;
-              tracks.sort(compareTracks);
-
-              fetch(tracks[0].baseUrl + "&fmt=json3")
-                .then(function (response) {
-                  return response.json();
-                })
-                .then(function (transcript) {
-                  const parsedTranscript = transcript.events
-                    .filter(function (x) {
-                      return x.segs;
-                    })
-                    .map(function (x) {
-                      return x.segs
-                        .map((y) => {
-                          return y.utf8;
-                        })
-                        .join(" ");
-                    })
-                    .join(" ")
-                    .replace(/[\u200B-\u200D\uFEFF]/g, "")
-                    .replace(/\s+/g, " ");
-
-                  chrome.runtime.sendMessage(
-                    {
-                      type: "SUMMARIZE",
-                      value: parsedTranscript,
-                      videoTitle: player.videoDetails.title,
-                    },
-                    (response) => {
-                      if (chrome.runtime.lastError) {
-                        console.error(chrome.runtime.lastError);
-                        displayError("Error sending message. Please try again.");
-                      } else if (response.error) {
-                        if (response.message === undefined) {
-                          displayError("Missing key or summary");
-                        } else {
-                          displayError(response.message);
-                        }
-                      } else {
-                        summary = response.summary;
-                        chrome.storage.local.set({ [videoId]: summary });
-                        displaySummary(summary);
-                        disableAiButton();
-                      }
-                    }
-                  );
-                });
+              fetchSummary(player, videoId);
             });
         }
       }
     });
+  };
+
+  const fetchSummary = (player, videoId) => {
+    if (!player.captions || !player.captions.playerCaptionsTracklistRenderer) {
+      displayError("No captions available for this video.");
+      return;
+    }
+  
+    const tracks = player.captions.playerCaptionsTracklistRenderer.captionTracks;
+    tracks.sort(compareTracks);
+  
+    fetch(`${tracks[0].baseUrl}&fmt=json3`)
+      .then((response) => response.json())
+      .then((transcript) => {
+        const parsedTranscript = transcript.events
+          .filter((x) => x.segs)
+          .map((x) =>
+            x.segs
+              .map((y) => y.utf8)
+              .join(" ")
+          )
+          .join(" ")
+          .replace(/[\u200B-\u200D\uFEFF]/g, "")
+          .replace(/\s+/g, " ")
+
+        sendTranscriptForSummary(parsedTranscript, videoId, player.videoDetails.title);
+    });
+  };
+  
+  const sendTranscriptForSummary = (parsedTranscript, videoId, videoTitle) => {
+    chrome.runtime.sendMessage(
+      {
+        type: "SUMMARIZE",
+        value: parsedTranscript,
+        videoTitle: videoTitle,
+      },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          displayError("Error sending message. Please try again.");
+        } else if (response.error) {
+          displayError(response.message || "Missing key or summary");
+        } else {
+          chrome.storage.local.set({ [videoId]: response.summary });
+          displaySummary(response.summary);
+          disableAiButton();
+        }
+      }
+    );
   };
 
   function compareTracks(track1, track2) {
@@ -223,10 +214,10 @@
       summaryDiv.style.marginTop = "10px";
       summaryDiv.style.padding = "12px";
       summaryDiv.style.borderRadius = "14px";
-      summaryDiv.style.backgroundColor = "rgba(39, 39, 39, 0.9)";
+      summaryDiv.style.backgroundColor = theme === "dark" ? "rgba(39, 39, 39, 0.9)" : "rgba(242, 242, 242, 1)";
       summaryDiv.style.textAlign = "center";
       summaryDiv.style.fontSize = "14px";
-      summaryDiv.style.color = "#fff";
+      summaryDiv.style.color = theme === "dark" ? "#fff" : "#000000";
 
       middleRow.parentNode.insertBefore(summaryDiv, middleRow.nextSibling);
     }
@@ -256,8 +247,8 @@
     toggleButton.style.padding = "5px";
     toggleButton.style.border = "none";
     toggleButton.style.borderRadius = "5px";
-    toggleButton.style.backgroundColor = "#494949";
-    toggleButton.style.color = "#fff";
+    toggleButton.style.backgroundColor = theme === "dark" ? "#494949" : "#d9d9d9";
+    toggleButton.style.color = theme === "dark" ? "#fff" : "#000000";
     toggleButton.style.cursor = "pointer";
 
     const summaryContainer = document.createElement("div");
@@ -363,7 +354,6 @@
 
       const videoId = new URLSearchParams(window.location.search).get("v");
       if (!videoId) {
-        console.warn("Video ID not found");
         return;
       }
 
