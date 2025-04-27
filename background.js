@@ -62,7 +62,11 @@ const summarizeText = async (text, videoTitle) => {
         parts: [
           {
             text: `
-              Summarize the following subtitles from the video titled "${videoTitle}". The summary should be not too long, concise, in ${lang} language and easy to read:\n\n${text}.
+              Summarize the following subtitles from the video titled "${videoTitle}". 
+              The summary should be not too long, concise, in ${lang} language and easy to read:\n\n${text}. 
+              Return as a plain text without any additional formatting. 
+              Do not include any code blocks or markdown formatting. 
+              Just provide the summary in plain text.
             `,
           },
         ],
