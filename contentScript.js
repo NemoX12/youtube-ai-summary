@@ -34,7 +34,7 @@
         width: 7px;
         height: 7px;
         border-radius: 50%;
-        background: #000;
+        background: ${theme === "dark" ? "#fff" : "#000000"};
         margin: -4px 0 0 -4px;
       }
       .roller div:nth-child(1) {
